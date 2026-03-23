@@ -3,6 +3,14 @@
 #include <vector>
 #include "protocol.h"
 
+#ifndef ITERATIONS
+#define ITERATIONS 1000
+#endif
+
+#ifndef BOUND
+#define BOUND 4.0f
+#endif
+
 class worker
 {
 public:

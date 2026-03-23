@@ -12,9 +12,9 @@ Path worker::computePath(float x, float y)
     std::vector<Data> ret;
     Point p = {x, y};
     ret.push_back(Data{p.x, p.y, 0.0});
-    for (int i = 1; i < 1000; i++)
+    for (int i = 1; i < ITERATIONS; i++)
     {
-        if (p.x * p.x + p.y * p.y > 2.0)
+        if (p.x * p.x + p.y * p.y > BOUND)
         {
             ret.push_back(Data{p.x, p.y, -1.0f});
             break;
@@ -78,9 +78,9 @@ void worker::compute()
             {
                 continue;
             }
-            // for(int i = 1; i < size; i++){
-            //     orbit.pop_back();
-            // }
+            for(int i = 1; i < size; i++){
+                orbit.pop_back();
+            }
 
             batch.push_back((float)orbit.size());
             for (Data d : orbit) {

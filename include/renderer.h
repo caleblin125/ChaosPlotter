@@ -42,4 +42,6 @@ private:
     ViewParams params;
 
     int error = 0;
+
+    static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 };

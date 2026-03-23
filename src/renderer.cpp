@@ -57,6 +57,16 @@ Color renderer::HSVtoRGB(float h, float s, float v)
     return {r1 + m, g1 + m, b1 + m};
 }
 
+
+void renderer::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    renderer* r = static_cast<renderer*>(glfwGetWindowUserPointer(window));
+    if (r) {
+        r->scale.scale *= exp(-yoffset*0.05);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+}
+
 renderer::renderer(int rank, int size) : rank(rank), size(size)
 {
     glfwInit();
@@ -115,6 +125,9 @@ renderer::renderer(int rank, int size) : rank(rank), size(size)
     scale.scale = 1.5f;
     scale.cx = -0.5f;
     scale.cy = 0.0f;
+
+    glfwSetWindowUserPointer(window, this);
+    glfwSetScrollCallback(window, scroll_callback);
 }
 
 void renderer::recieve()
@@ -228,7 +241,8 @@ void renderer::mainloop()
 {
     printf("Started renderer mainloop\n");
 
-    static auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
+    auto prevT = std::chrono::steady_clock::now();
     int total = 0;
     while (!glfwWindowShouldClose(window))
     {
@@ -244,13 +258,40 @@ void renderer::mainloop()
                                  w, h, 0);
         }
 
+        float dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - prevT).count();
+        prevT = std::chrono::steady_clock::now();
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        {
+            scale.cy += scale.scale * 0.5 * dt;
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        {
+            // get monitor dimensions for windowed mode position
+            scale.cy -= scale.scale * 0.5 * dt;
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        {
+            scale.cx -= scale.scale * 0.5 * dt;
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        {
+            scale.cx += scale.scale * 0.5*dt;
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
         recieve();
 
         if(paths.size() > 0){
             auto now = std::chrono::steady_clock::now();
             double elapsed = std::chrono::duration<double>(now - start).count();
             total += paths.size();
-            printf("Paths per second: %lf, total paths %d \n", (double)total / elapsed, total);
+            // printf("Paths per second: %lf, total paths %d \n", (double)total / elapsed, total);
         }
 
         render();
