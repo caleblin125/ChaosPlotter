@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <mpi.h>
 #include <chrono>
+#include <cstring>
 
 // h: 0-360, s: 0-1, v: 0-1
 Color renderer::HSVtoRGB(float h, float s, float v)
@@ -84,6 +85,14 @@ renderer::renderer(int rank, int size) : rank(rank), size(size)
         nullptr  // no shared context
     );
 
+    // window = glfwCreateWindow(
+    //     mode->width / 2,
+    //     mode->height / 2,
+    //     "ChaosPlotter",
+    //     nullptr, // fullscreen
+    //     nullptr  // no shared context
+    // );
+
     if (!window)
     {
         std::cerr << "Failed to create GLFW window\n";
@@ -117,17 +126,26 @@ void renderer::recieve()
 
     while (flag)
     {
-        MPI_Status status;
-        int size;
-        MPI_Recv(&size, 1, MPI_INT, MPI_ANY_SOURCE, TAG_PATH_SIZE, MPI_COMM_WORLD, &status);
+        int source = status.MPI_SOURCE;
+        int pathCount, batchSize;
+        MPI_Recv(&batchSize, 1, MPI_INT, source, TAG_PATH_SIZE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        int source = status.MPI_SOURCE; // find out who sent it
+        std::vector<float> batch(batchSize);
+        MPI_Recv(batch.data(), batchSize, MPI_FLOAT, source, TAG_PATH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        Path path(size);
+        // unpack
+        int i = 0;
+        float* raw = batch.data();
+        while (i < batchSize) {
+            int sz = (int)raw[i++];
 
-        MPI_Recv(path.data(), size * 3, MPI_FLOAT, source, TAG_PATH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            Path path(sz);
+            memcpy(path.data(), raw + i, sz * sizeof(Data));
+            i += sz * 3;
 
-        paths.push_back(path);
+            paths.push_back(std::move(path));
+        }
+
         MPI_Iprobe(MPI_ANY_SOURCE, TAG_PATH_SIZE, MPI_COMM_WORLD, &flag, &status);
     }
 }
@@ -176,22 +194,27 @@ void renderer::render()
 
     for (Path path : paths)
     {
-        for (int i = 0; i < path.size() - 1; i++)
-        {
-            Data p1 = path[i];
-            Data p2 = path[i + 1];
 
-            float a = atan2(p2.y - p1.y, p2.x - p1.x);
-            float dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
+        //Colorful 
+        // for (int i = 0; i < path.size() - 1; i++)
+        // {
+        //     Data p1 = path[i];
+        //     Data p2 = path[i + 1];
 
-            float p = (float)i / (float)path.size();
-            Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
+        //     float a = atan2(p2.y - p1.y, p2.x - p1.x);
+        //     float dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
 
-            glColor4f(c.r, c.g, c.b, 0.02f *dist /4.0);
-            glVertex2f(p1.x, p1.y);
-        }
-        // glColor4f(1.0, 1.0, 1.0, 1.0);
-        // glVertex2f(path[0].x, path[0].y);
+        //     float p = (float)i / (float)path.size();
+        //     Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
+
+        //     glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0f);
+        //     glVertex2f(p1.x, p1.y);
+
+        // }
+
+        //Original mandelbrot style
+        glColor4f(1.0, 1.0, 1.0, 1.0);
+        glVertex2f(path[0].x, path[0].y);
     }
     paths.clear();
 
@@ -222,11 +245,12 @@ void renderer::mainloop()
         }
 
         recieve();
+
         if(paths.size() > 0){
             auto now = std::chrono::steady_clock::now();
             double elapsed = std::chrono::duration<double>(now - start).count();
             total += paths.size();
-            printf("Paths per second: %lf \n", (double)total / elapsed);
+            printf("Paths per second: %lf, total paths %d \n", (double)total / elapsed, total);
         }
 
         render();

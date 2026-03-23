@@ -6,14 +6,14 @@
 class worker
 {
 public:
-    worker(int rank);
+    worker(int rank, int size);
     Path computePath(float x, float y);
     void compute();
     void recieve();
     void mainloop();
 
 private:
-    int rank;
+    int rank, size;
     ViewParams window;
 
     bool endWorker = false;

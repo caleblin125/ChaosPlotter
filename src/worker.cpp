@@ -3,7 +3,7 @@
 #include <random>
 #include <mpi.h>
 
-worker::worker(int rank) : rank(rank), window({0, 0, 0, 0, 1})
+worker::worker(int rank, int size) : rank(rank), size(size), window({0, 0, 0, 0, 1})
 {
 }
 
@@ -35,6 +35,10 @@ void worker::recieve()
     if (paramFlag)
     {
         MPI_Recv(&window, sizeof(ViewParams), MPI_BYTE, 0, TAG_VIEWING, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
+        float d = window.right - window.left;
+        window.left = ((float)rank-1)*d/((float)size - 1) + window.left;
+        window.right = ((float)rank)*d/((float)size - 1) + window.left;
         printf("Worker %d received new params\n", rank);
     }
 
@@ -52,15 +56,13 @@ void worker::recieve()
 
 void worker::compute()
 {
+    std::vector<float> batch;
+    int pathCount = 0;
+
     for (float cx = window.left; cx <= window.right; cx += window.d)
     {
         for (float cy = window.top; cy <= window.bottom; cy += window.d)
         {
-            recieve();
-            if (endWorker)
-            {
-                break;
-            }
             float dx = window.d * ((float)random() / (float)RAND_MAX - 0.5);
             float dy = window.d * ((float)random() / (float)RAND_MAX - 0.5);
 
@@ -80,19 +82,31 @@ void worker::compute()
             //     orbit.pop_back();
             // }
 
-            MPI_Request reqs[2];
-            MPI_Isend(&size, 1, MPI_INT, 0, TAG_PATH_SIZE, MPI_COMM_WORLD, &reqs[0]);
-            MPI_Isend(orbit.data(), size * 3, MPI_FLOAT, 0, TAG_PATH, MPI_COMM_WORLD, &reqs[1]);
-
-            MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+            batch.push_back((float)orbit.size());
+            for (Data d : orbit) {
+                batch.push_back(d.x);
+                batch.push_back(d.y);
+                batch.push_back(d.f);
+            }
+            pathCount++;
         }
     }
+
+    int batchSize = batch.size();
+    MPI_Send(&batchSize, 1, MPI_INT, 0, TAG_PATH_SIZE, MPI_COMM_WORLD);
+    MPI_Send(batch.data(), batchSize, MPI_FLOAT, 0, TAG_PATH, MPI_COMM_WORLD);
 }
 
 void worker::mainloop()
 {
     while (true)
     {
+        recieve();
+        if (endWorker)
+        {
+            break;
+        }
+
         compute();
         if (endWorker)
         {

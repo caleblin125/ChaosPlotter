@@ -31,7 +31,7 @@ int main(int argc, char **argv)
         }
     }
     else{
-        worker w(rank);
+        worker w(rank, size);
         w.mainloop();
     }
 
