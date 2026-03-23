@@ -6,7 +6,7 @@
 std::vector<Data> compute(float x, float y){
     std::vector<Data> ret;
     float xi = x, yi = y;
-    for(int i = 0; i < 100; i++){
+    for(int i = 0; i < 1000; i++){
         if(xi*xi + yi*yi > 4){
             ret.push_back(Data{xi, yi, (float)-1});
             break;

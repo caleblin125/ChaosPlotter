@@ -1,6 +1,8 @@
 #include "renderer.h"
+
 #include <math.h>
 #include <random>
+#include <iostream>
 #include "function.h"
 
 // h: 0-360, s: 0-1, v: 0-1
@@ -42,14 +44,17 @@ void render(GLFWwindow* window){
 
     glBegin(GL_POINTS);
 
-    float d = 0.005f;
-    for (float cx = -2.0f; cx <= 1.0f; cx += d)
+    float d = 0.05f;
+    for (float cx = -2.0f; cx <= 2.0f; cx += d)
     {
-        for (float cy = -1.5f; cy <= 1.5f; cy += d)
+        for (float cy = -2.0f; cy <= 2.0f; cy += d)
         {
-            float dx = (float)random() / INT64_MAX;
-            float dy = (float)random() / INT64_MAX;
-            std::vector<Data> orbit = compute(cx+dx, cy+dy);
+            float dx = d * ((float)random() / (float)INT32_MAX - 0.5);
+            float dy = d * ((float)random() / (float)INT32_MAX - 0.5);
+
+            float xi = cx+dx;
+            float yi = cy+dy;
+            std::vector<Data> orbit = compute(xi, yi);
             if(orbit.size() == 0){
                 continue;
             }
@@ -60,13 +65,16 @@ void render(GLFWwindow* window){
             {
                 Data p1 = orbit[i];
                 Data p2 = orbit[i+1];
-                float sx = (p1.x + 2.0f) / 3.0f * width;
-                float sy = (p1.y + 1.5f) / 3.0f * height;
+                float sx = (p1.x + 2.5f) / 4.0f * width;
+                float sy = (p1.y + 2.0f) / 4.0f * height;
                 
                 float a = atan2(p2.y-p1.y, p2.x-p1.x);
-                Color c = HSVtoRGB(a*360.0/M_PI,1.0, 1.0);
+                float d = sqrt((p2.y-p1.y)*(p2.y-p1.y) + (p2.x-p1.x)*(p2.x-p1.x));
 
-                glColor4f(c.r, c.g, c.b, 0.10f);
+                float p = (float)i / (float)orbit.size();
+                Color c = HSVtoRGB(a*360.0/M_PI/2.0 + 180.0, 1.0, 1.0);
+
+                glColor4f(c.r, c.g, c.b, 0.10f*p*(d/4.0f));
                 glVertex2f(sx, sy);
             }
         }
