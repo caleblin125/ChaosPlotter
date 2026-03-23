@@ -1,10 +1,10 @@
 # Compiler
-CXX = g++
-CC  = gcc
+CXX = mpic++
+CC  = mpicc
 
 CXXFLAGS = -std=c++17 -O3 -Iinclude
 CFLAGS   = -O3 -Iinclude
-LDFLAGS = -lglfw -lGL
+LDFLAGS = -lglfw -lGL -lm
 
 # Directories
 SRC_DIR = src

@@ -4,51 +4,31 @@
 #include <GL/glu.h>
 #include <iostream>
 #include <vector>
+#include <mpi.h>
 
 #include "renderer.h"
 
-int main()
+int main(int argc, char **argv)
 {
-    if (!glfwInit())
-        return -1;
+    MPI_Init(&argc, &argv);
 
-    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-    if (!monitor)
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); // this process's ID
+    MPI_Comm_size(MPI_COMM_WORLD, &size); // total number of processes
+    printf("Hello from rank %d of %d\n", rank, size);
+
+    if (rank == 0)
     {
-        std::cerr << "Failed to get primary monitor\n";
-        return -1;
+        renderer render;
+        if (!render.isError())
+        {
+            render.mainloop();
+        }
+    }
+    else{
+        
     }
 
-    const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-    if (!mode)
-    {
-        std::cerr << "Failed to get video mode\n";
-        return -1;
-    }
-
-    // Create fullscreen window using the monitor's current resolution
-    GLFWwindow *window = glfwCreateWindow(
-        mode->width,
-        mode->height,
-        "ChaosPlotter",
-        monitor, // fullscreen
-        nullptr  // no shared context
-    );
-    if (!window)
-    {
-        std::cerr << "Failed to create GLFW window\n";
-        glfwTerminate();
-        return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-
-    renderInit(window);
-    while (!glfwWindowShouldClose(window))
-    {
-        render(window);
-    }
-
-    glfwTerminate();
+    MPI_Finalize();
     return 0;
 }

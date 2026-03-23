@@ -2,12 +2,31 @@
 
 #include <GLFW/glfw3.h>
 
-
-struct Color {
+struct Color
+{
     float r, g, b;
 };
 
-void renderInit(GLFWwindow* window);
-void render(GLFWwindow* window);
+class renderer
+{
+public:
+    renderer();
+    int shouldClose();
+    void render();
+    void mainloop();
+    int isError() { return error; }
 
-Color HSVtoRGB(float h, float s, float v);
+private:
+    Color HSVtoRGB(float h, float s, float v);
+
+    GLFWwindow *window;
+
+    struct Scale
+    {
+        float scale;
+        float cx;
+        float cy;
+    } scale;
+
+    int error = 0;
+};
