@@ -14,6 +14,11 @@
 #define DENSITY 40
 #endif
 
+
+#ifndef CULLING
+#define CULLING 1.0
+#endif
+
 struct ViewParams
 {
     double left, right, top, bottom, d;

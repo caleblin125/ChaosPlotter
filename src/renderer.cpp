@@ -137,7 +137,7 @@ void renderer::recieve()
 
     MPI_Iprobe(MPI_ANY_SOURCE, TAG_PATH_SIZE, MPI_COMM_WORLD, &flag, &status);
 
-    while (flag)
+    while (flag && (paths.size() < 100))
     {
         int source = status.MPI_SOURCE;
         int pathCount, batchSize;
@@ -194,7 +194,7 @@ void renderer::render()
 
     if ((params.left != left) || (params.right != right) || (params.top != top) || (params.bottom != bottom) || (params.d != d))
     {   
-        printf("Sent New Window Data: scale: %e center: (%e, %e)\n", scale.scale, scale.cx, scale.cy);
+        // printf("Sent New Window Data: scale: %e center: (%e, %e)\n", scale.scale, scale.cx, scale.cy);
         params = {left, right, top, bottom, d};
         for (int i = 1; i < size; i++){
             MPI_Send(&params, sizeof(ViewParams), MPI_BYTE, i, TAG_VIEWING, MPI_COMM_WORLD);
@@ -209,21 +209,22 @@ void renderer::render()
     {
 
         //Colorful 
-        // for (int i = 0; i < path.size() - 1; i++)
-        // {
-        //     Data p1 = path[i];
-        //     Data p2 = path[i + 1];
+        for (int i = 0; i < path.size() - 1; i++)
+        {
+            Data p1 = path[i];
+            Data p2 = path[i + 1];
 
-        //     double a = atan2(p2.y - p1.y, p2.x - p1.x);
-        //     double dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
+            double a = atan2(p2.y - p1.y, p2.x - p1.x);
+            double dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
 
-        //     double p = (double)i / (double)path.size();
-        //     Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
+            double p = (double)i / (double)path.size();
+            Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
 
-        //     glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0f);
-        //     glVertex2f(p1.x, p1.y);
+            // glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0f);
+            glColor4f(c.r, c.g, c.b, 0.02f);
+            glVertex2f(p1.x, p1.y);
 
-        // }
+        }
 
         //Original mandelbrot style
         if(path[0].f == ITERATIONS){
@@ -300,7 +301,7 @@ void renderer::mainloop()
             auto now = std::chrono::steady_clock::now();
             double elapsed = std::chrono::duration<double>(now - start).count();
             total += paths.size();
-            // printf("Paths per second: %lf, total paths %d \n", (double)total / elapsed, total);
+            printf("Paths per second: %lf, total paths %d \n", (double)total / elapsed, total);
         }
 
         render();

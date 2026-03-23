@@ -40,7 +40,7 @@ void worker::recieve()
         // window.left = ((double)rank-1)*d/((double)size - 1) + window.left;
         // window.right = ((double)rank)*d/((double)size - 1) + window.left;
 
-        printf("Worker %d received new params: x[%e, %e] y[%e, %e] %e\n", rank, window.left, window.right, window.top, window.bottom, window.d);
+        // printf("Worker %d received new params: x[%e, %e] y[%e, %e] %e\n", rank, window.left, window.right, window.top, window.bottom, window.d);
         paramFlag = 0;
         MPI_Iprobe(0, TAG_VIEWING, MPI_COMM_WORLD, &paramFlag, &statusV);
     }
@@ -84,7 +84,7 @@ void worker::compute()
             //     continue;
             // }
 
-            for (int i = 1; i < size; i++)
+            for (int i = 0; (double)i < CULLING*(double)(size-1); i++)
             {
                 orbit.pop_back();
             }
