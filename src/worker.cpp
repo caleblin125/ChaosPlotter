@@ -35,7 +35,7 @@ void worker::recieve()
     while (paramFlag)
     {
         MPI_Recv(&window, sizeof(ViewParams), MPI_BYTE, 0, TAG_VIEWING, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        
+
         // double d = window.right - window.left;
         // window.left = ((double)rank-1)*d/((double)size - 1) + window.left;
         // window.right = ((double)rank)*d/((double)size - 1) + window.left;
@@ -52,8 +52,9 @@ void worker::recieve()
     {
         int msg;
         MPI_Recv(&msg, 1, MPI_INT, 0, TAG_SHUTDOWN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        printf("Recieved End Worker %d \n", rank);
+        MPI_Send(&msg, 1, MPI_INT, 0, TAG_SHUTDOWN, MPI_COMM_WORLD);
         endWorker = true;
-        printf("Ending Worker %d \n", rank);
     }
 }
 
@@ -67,7 +68,7 @@ void worker::compute()
         for (double cy = window.top; cy <= window.bottom; cy += window.d)
         {
             // double dx = window.d * ((double)random() / (double)RAND_MAX - 0.5);
-            double dx = (window.d/((double)size - 1)) * ((double)random() / (double)RAND_MAX) + window.d*((double)rank-1)/((double)size - 1);
+            double dx = (window.d / ((double)size - 1)) * ((double)random() / (double)RAND_MAX) + window.d * ((double)rank - 1) / ((double)size - 1);
             double dy = window.d * ((double)random() / (double)RAND_MAX - 0.5);
 
             double xi = cx + dx;
@@ -83,13 +84,15 @@ void worker::compute()
             //     continue;
             // }
 
-            for(int i = 1; i < size; i++){
+            for (int i = 1; i < size; i++)
+            {
                 orbit.pop_back();
             }
             orbit[0].f = size;
 
             batch.push_back((double)orbit.size());
-            for (Data d : orbit) {
+            for (Data d : orbit)
+            {
                 batch.push_back(d.x);
                 batch.push_back(d.y);
                 batch.push_back(d.f);
@@ -110,14 +113,11 @@ void worker::mainloop()
         recieve();
         if (endWorker)
         {
-            break;
+            printf("Ending Worker %d \n", rank);
+            return;
         }
 
         compute();
-        if (endWorker)
-        {
-            break;
-        }
     }
     return;
 }

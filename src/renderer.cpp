@@ -319,6 +319,20 @@ void renderer::end()
     {
         MPI_Send(&endMsg, 1, MPI_INT, i, TAG_SHUTDOWN, MPI_COMM_WORLD);
         printf("Sent shutdown to worker %d\n", i);
+
+        int flag;
+        MPI_Status status;
+
+        MPI_Iprobe(i, TAG_SHUTDOWN, MPI_COMM_WORLD, &flag, &status);
+        while (!flag)
+        {
+            recieve();
+            MPI_Iprobe(i, TAG_SHUTDOWN, MPI_COMM_WORLD, &flag, &status);
+            // printf("Awaiting %d\n", i);
+        }
+        int endPong;
+        MPI_Recv(&endPong, 1, MPI_INT, i, TAG_SHUTDOWN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        printf("Shutdown worker %d\n", i);
     }
     printf("Ending\n");
 }
