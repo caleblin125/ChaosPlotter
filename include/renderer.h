@@ -9,4 +9,5 @@ struct Color {
 
 void renderInit(GLFWwindow* window);
 void render(GLFWwindow* window);
+
 Color HSVtoRGB(float h, float s, float v);
