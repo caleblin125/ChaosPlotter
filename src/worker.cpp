@@ -11,7 +11,8 @@ Path worker::computePath(float x, float y)
 {
     std::vector<Data> ret;
     Point p = {x, y};
-    for (int i = 0; i < 1000; i++)
+    ret.push_back(Data{p.x, p.y, 0.0});
+    for (int i = 1; i < 1000; i++)
     {
         if (p.x * p.x + p.y * p.y > 2.0)
         {
@@ -28,24 +29,24 @@ Path worker::computePath(float x, float y)
 
 void worker::recieve()
 {
-
-    MPI_Request recvRequest;
-    MPI_Ibcast(&window, sizeof(ViewParams), MPI_BYTE, 0, MPI_COMM_WORLD, &recvRequest);
-
-    int flag;
-    MPI_Test(&recvRequest, &flag, MPI_STATUS_IGNORE);
-    if (flag)
+    int paramFlag;
+    MPI_Status statusV;
+    MPI_Iprobe(0, TAG_VIEWING, MPI_COMM_WORLD, &paramFlag, &statusV);
+    if (paramFlag)
     {
-        printf("Recieved New Window Size\n");
+        MPI_Recv(&window, sizeof(ViewParams), MPI_BYTE, 0, TAG_VIEWING, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        printf("Worker %d received new params\n", rank);
     }
 
     int endFlag;
-    MPI_Status status;
-    MPI_Iprobe(0, TAG_SHUTDOWN, MPI_COMM_WORLD, &endFlag, &status);
-
+    MPI_Status statusE;
+    MPI_Iprobe(0, TAG_SHUTDOWN, MPI_COMM_WORLD, &endFlag, &statusE);
     if (endFlag)
     {
+        int msg;
+        MPI_Recv(&msg, 1, MPI_INT, 0, TAG_SHUTDOWN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         endWorker = true;
+        printf("Ending Worker %d \n", rank);
     }
 }
 
@@ -55,6 +56,11 @@ void worker::compute()
     {
         for (float cy = window.top; cy <= window.bottom; cy += window.d)
         {
+            recieve();
+            if (endWorker)
+            {
+                break;
+            }
             float dx = window.d * ((float)random() / (float)RAND_MAX - 0.5);
             float dy = window.d * ((float)random() / (float)RAND_MAX - 0.5);
 
@@ -70,6 +76,9 @@ void worker::compute()
             {
                 continue;
             }
+            // for(int i = 1; i < size; i++){
+            //     orbit.pop_back();
+            // }
 
             MPI_Request reqs[2];
             MPI_Isend(&size, 1, MPI_INT, 0, TAG_PATH_SIZE, MPI_COMM_WORLD, &reqs[0]);
@@ -84,13 +93,11 @@ void worker::mainloop()
 {
     while (true)
     {
-        recieve();
-
+        compute();
         if (endWorker)
         {
             break;
         }
-
-        compute();
     }
+    return;
 }

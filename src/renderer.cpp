@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <mpi.h>
+#include <chrono>
 
 // h: 0-360, s: 0-1, v: 0-1
 Color renderer::HSVtoRGB(float h, float s, float v)
@@ -164,9 +165,9 @@ void renderer::render()
     {   
         printf("Sent New Window Data\n");
         params = {left, right, top, bottom, d};
-        MPI_Request bcastRequest;
-        MPI_Ibcast(&params, sizeof(ViewParams), MPI_BYTE, 0, MPI_COMM_WORLD, &bcastRequest);
-        MPI_Wait(&bcastRequest, MPI_STATUS_IGNORE);
+        for (int i = 1; i < size; i++){
+            MPI_Send(&params, sizeof(ViewParams), MPI_BYTE, i, TAG_VIEWING, MPI_COMM_WORLD);
+        }
     }
 
     // glClear(GL_COLOR_BUFFER_BIT);
@@ -186,9 +187,11 @@ void renderer::render()
             float p = (float)i / (float)path.size();
             Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
 
-            glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0);
+            glColor4f(c.r, c.g, c.b, 0.02f *dist /4.0);
             glVertex2f(p1.x, p1.y);
         }
+        // glColor4f(1.0, 1.0, 1.0, 1.0);
+        // glVertex2f(path[0].x, path[0].y);
     }
     paths.clear();
 
@@ -201,6 +204,9 @@ void renderer::render()
 void renderer::mainloop()
 {
     printf("Started renderer mainloop\n");
+
+    static auto start = std::chrono::steady_clock::now();
+    int total = 0;
     while (!glfwWindowShouldClose(window))
     {
         // Press Escape to exit fullscreen
@@ -216,6 +222,13 @@ void renderer::mainloop()
         }
 
         recieve();
+        if(paths.size() > 0){
+            auto now = std::chrono::steady_clock::now();
+            double elapsed = std::chrono::duration<double>(now - start).count();
+            total += paths.size();
+            printf("Paths per second: %lf \n", (double)total / elapsed);
+        }
+
         render();
     }
 
@@ -226,10 +239,12 @@ void renderer::mainloop()
 
 void renderer::end()
 {
+    printf("Sending shutdown to %d workers\n", size - 1);
     int endMsg = -1;
     for (int i = 1; i < size; i++)
     {
         MPI_Send(&endMsg, 1, MPI_INT, i, TAG_SHUTDOWN, MPI_COMM_WORLD);
+        printf("Sent shutdown to worker %d\n", i);
     }
     printf("Ending\n");
 }
