@@ -4,7 +4,7 @@
 #include <random>
 #include <iostream>
 #include <algorithm>
-#include "function.h"
+#include <mpi.h>
 
 // h: 0-360, s: 0-1, v: 0-1
 Color renderer::HSVtoRGB(float h, float s, float v)
@@ -55,7 +55,7 @@ Color renderer::HSVtoRGB(float h, float s, float v)
     return {r1 + m, g1 + m, b1 + m};
 }
 
-renderer::renderer()
+renderer::renderer(int rank, int size) : rank(rank), size(size)
 {
     glfwInit();
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
@@ -107,13 +107,39 @@ renderer::renderer()
     scale.cy = 0.0f;
 }
 
-int renderer::shouldClose()
+void renderer::recieve()
 {
-    return glfwWindowShouldClose(window);
+    int flag;
+    MPI_Status status;
+
+    MPI_Iprobe(MPI_ANY_SOURCE, TAG_PATH_SIZE, MPI_COMM_WORLD, &flag, &status);
+
+    while (flag)
+    {
+        MPI_Status status;
+        int size;
+        MPI_Recv(&size, 1, MPI_INT, MPI_ANY_SOURCE, TAG_PATH_SIZE, MPI_COMM_WORLD, &status);
+
+        int source = status.MPI_SOURCE; // find out who sent it
+
+        Path path(size);
+
+        MPI_Recv(path.data(), size * 3, MPI_FLOAT, source, TAG_PATH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        paths.push_back(path);
+        MPI_Iprobe(MPI_ANY_SOURCE, TAG_PATH_SIZE, MPI_COMM_WORLD, &flag, &status);
+    }
 }
 
 void renderer::render()
 {
+    if (paths.size() == 0)
+    {
+        return;
+    }
+
+    // printf("Path size: %d \n", paths.size());
+
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
@@ -129,62 +155,42 @@ void renderer::render()
     float right = widthf / bound * scale.scale + scale.cx;
     float top = -heightf / bound * scale.scale + scale.cy;
     float bottom = heightf / bound * scale.scale + scale.cy;
+    float d = scale.scale / DENSITY;
     glOrtho(left, right, top, bottom, -1, 1); // ← ortho before switching
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    // glClear(GL_COLOR_BUFFER_BIT);
-
-    // Press Escape to exit fullscreen
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    {
-        // get monitor dimensions for windowed mode position
-        const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        int w = 800, h = 600;
-        glfwSetWindowMonitor(window, NULL,
-                             (mode->width - w) / 2,  // centered X
-                             (mode->height - h) / 2, // centered Y
-                             w, h, 0);
+    if ((params.left != left) || (params.right != right) || (params.top != top) || (params.bottom != bottom) || (params.d != d))
+    {   
+        printf("Sent New Window Data\n");
+        params = {left, right, top, bottom, d};
+        MPI_Request bcastRequest;
+        MPI_Ibcast(&params, sizeof(ViewParams), MPI_BYTE, 0, MPI_COMM_WORLD, &bcastRequest);
+        MPI_Wait(&bcastRequest, MPI_STATUS_IGNORE);
     }
+
+    // glClear(GL_COLOR_BUFFER_BIT);
 
     glBegin(GL_POINTS);
 
-    float n = 40;
-    float d = scale.scale / n;
-    for (float cx = left; cx <= right; cx += d)
+    for (Path path : paths)
     {
-        for (float cy = top; cy <= bottom; cy += d)
+        for (int i = 0; i < path.size() - 1; i++)
         {
-            float dx = d * ((float)random() / (float)RAND_MAX - 0.5);
-            float dy = d * ((float)random() / (float)RAND_MAX - 0.5);
+            Data p1 = path[i];
+            Data p2 = path[i + 1];
 
-            float xi = cx + dx;
-            float yi = cy + dy;
-            std::vector<Data> orbit = compute(xi, yi);
-            if (orbit.size() == 0)
-            {
-                continue;
-            }
-            if (orbit.back().f < 0)
-            {
-                continue;
-            }
-            for (int i = 0; i < orbit.size() - 1; i++)
-            {
-                Data p1 = orbit[i];
-                Data p2 = orbit[i + 1];
+            float a = atan2(p2.y - p1.y, p2.x - p1.x);
+            float dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
 
-                float a = atan2(p2.y - p1.y, p2.x - p1.x);
-                float dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
+            float p = (float)i / (float)path.size();
+            Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
 
-                float p = (float)i / (float)orbit.size();
-                Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
-
-                glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0);
-                glVertex2f(p1.x, p1.y);
-            }
+            glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0);
+            glVertex2f(p1.x, p1.y);
         }
     }
+    paths.clear();
 
     glEnd();
 
@@ -194,9 +200,36 @@ void renderer::render()
 
 void renderer::mainloop()
 {
-    while (!shouldClose())
+    printf("Started renderer mainloop\n");
+    while (!glfwWindowShouldClose(window))
     {
+        // Press Escape to exit fullscreen
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        {
+            // get monitor dimensions for windowed mode position
+            const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+            int w = 800, h = 600;
+            glfwSetWindowMonitor(window, NULL,
+                                 (mode->width - w) / 2,  // centered X
+                                 (mode->height - h) / 2, // centered Y
+                                 w, h, 0);
+        }
+
+        recieve();
         render();
     }
+
+    printf("Close window\n");
     glfwTerminate();
+    end();
+}
+
+void renderer::end()
+{
+    int endMsg = -1;
+    for (int i = 1; i < size; i++)
+    {
+        MPI_Send(&endMsg, 1, MPI_INT, i, TAG_SHUTDOWN, MPI_COMM_WORLD);
+    }
+    printf("Ending\n");
 }

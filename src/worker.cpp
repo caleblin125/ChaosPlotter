@@ -1,0 +1,96 @@
+#include "worker.h"
+#include "function.h"
+#include <random>
+#include <mpi.h>
+
+worker::worker(int rank) : rank(rank), window({0, 0, 0, 0, 1})
+{
+}
+
+Path worker::computePath(float x, float y)
+{
+    std::vector<Data> ret;
+    Point p = {x, y};
+    for (int i = 0; i < 1000; i++)
+    {
+        if (p.x * p.x + p.y * p.y > 2.0)
+        {
+            ret.push_back(Data{p.x, p.y, -1.0f});
+            break;
+        }
+
+        p = function(p, {x, y});
+
+        ret.push_back(Data{p.x, p.y, (float)i});
+    }
+    return ret;
+}
+
+void worker::recieve()
+{
+
+    MPI_Request recvRequest;
+    MPI_Ibcast(&window, sizeof(ViewParams), MPI_BYTE, 0, MPI_COMM_WORLD, &recvRequest);
+
+    int flag;
+    MPI_Test(&recvRequest, &flag, MPI_STATUS_IGNORE);
+    if (flag)
+    {
+        printf("Recieved New Window Size\n");
+    }
+
+    int endFlag;
+    MPI_Status status;
+    MPI_Iprobe(0, TAG_SHUTDOWN, MPI_COMM_WORLD, &endFlag, &status);
+
+    if (endFlag)
+    {
+        endWorker = true;
+    }
+}
+
+void worker::compute()
+{
+    for (float cx = window.left; cx <= window.right; cx += window.d)
+    {
+        for (float cy = window.top; cy <= window.bottom; cy += window.d)
+        {
+            float dx = window.d * ((float)random() / (float)RAND_MAX - 0.5);
+            float dy = window.d * ((float)random() / (float)RAND_MAX - 0.5);
+
+            float xi = cx + dx;
+            float yi = cy + dy;
+            std::vector<Data> orbit = computePath(xi, yi);
+            int size = orbit.size();
+            if (size == 0)
+            {
+                continue;
+            }
+            if (orbit.back().f < 0)
+            {
+                continue;
+            }
+
+            MPI_Request reqs[2];
+            MPI_Isend(&size, 1, MPI_INT, 0, TAG_PATH_SIZE, MPI_COMM_WORLD, &reqs[0]);
+            MPI_Isend(orbit.data(), size * 3, MPI_FLOAT, 0, TAG_PATH, MPI_COMM_WORLD, &reqs[1]);
+
+            MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+        }
+    }
+}
+
+void worker::mainloop()
+{
+    while (true)
+    {
+        recieve();
+
+        if (endWorker)
+        {
+            break;
+        }
+
+        compute();
+    }
+}

@@ -7,6 +7,7 @@
 #include <mpi.h>
 
 #include "renderer.h"
+#include "worker.h"
 
 int main(int argc, char **argv)
 {
@@ -19,14 +20,19 @@ int main(int argc, char **argv)
 
     if (rank == 0)
     {
-        renderer render;
-        if (!render.isError())
+        renderer r(rank, size);
+        if (!r.isError())
         {
-            render.mainloop();
+            r.mainloop();
+        }
+        else{
+            printf("Renderer Error!\n");
+            r.end();
         }
     }
     else{
-        
+        worker w(rank);
+        w.mainloop();
     }
 
     MPI_Finalize();
