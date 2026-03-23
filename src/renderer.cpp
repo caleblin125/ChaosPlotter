@@ -226,8 +226,17 @@ void renderer::render()
         // }
 
         //Original mandelbrot style
-        glColor4f(1.0, 1.0, 1.0, 1.0);
-        glVertex2f(path[0].x, path[0].y);
+        if(path[0].f == ITERATIONS){
+            glColor4f(1.0, 1.0, 1.0, 1.0);
+            glVertex2f(path[0].x, path[0].y);
+        }
+        else{
+            float r = fmod(path[0].f, 5.0f) / 5.0f / 2.0f;
+            float g = fmod(path[0].f, 7.0f) / 7.0f / 2.0f;
+            float b = fmod(path[0].f, 19.0f) / 19.0f / 2.0f;
+            glColor4f(r, g, b, 1.0);
+            glVertex2f(path[0].x, path[0].y);
+        }
     }
     paths.clear();
 

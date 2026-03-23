@@ -6,10 +6,6 @@
 #include "worker.h"
 #include <GLFW/glfw3.h>
 
-#ifndef DENSITY
-#define DENSITY 40
-#endif
-
 struct Color
 {
     float r, g, b;

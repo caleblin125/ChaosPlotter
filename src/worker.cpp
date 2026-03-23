@@ -36,10 +36,10 @@ void worker::recieve()
     {
         MPI_Recv(&window, sizeof(ViewParams), MPI_BYTE, 0, TAG_VIEWING, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
-        float d = window.right - window.left;
-        window.left = ((float)rank-1)*d/((float)size - 1) + window.left;
-        window.right = ((float)rank)*d/((float)size - 1) + window.left;
-        printf("Worker %d received new params\n", rank);
+        // float d = window.right - window.left;
+        // window.left = ((float)rank-1)*d/((float)size - 1) + window.left;
+        // window.right = ((float)rank)*d/((float)size - 1) + window.left;
+        // printf("Worker %d received new params\n", rank);
     }
 
     int endFlag;
@@ -74,13 +74,15 @@ void worker::compute()
             {
                 continue;
             }
-            if (orbit.back().f < 0)
-            {
-                continue;
-            }
+            // if (orbit.back().f < 0)
+            // {
+            //     continue;
+            // }
+
             for(int i = 1; i < size; i++){
                 orbit.pop_back();
             }
+            orbit[0].f = size;
 
             batch.push_back((float)orbit.size());
             for (Data d : orbit) {
