@@ -8,7 +8,7 @@
 
 struct Color
 {
-    float r, g, b;
+    double r, g, b;
 };
 
 class renderer
@@ -22,7 +22,7 @@ public:
     void end();
 
 private:
-    Color HSVtoRGB(float h, float s, float v);
+    Color HSVtoRGB(double h, double s, double v);
 
     int rank, size;
     GLFWwindow *window;
@@ -31,9 +31,9 @@ private:
 
     struct Scale
     {
-        float scale;
-        float cx;
-        float cy;
+        double scale;
+        double cx;
+        double cy;
     } scale;
     ViewParams params;
 

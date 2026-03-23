@@ -3,8 +3,8 @@
 #include <vector>
 
 struct Point{
-    float x;
-    float y;
+    double x;
+    double y;
 };
 
 Point function(Point p, Point pi);

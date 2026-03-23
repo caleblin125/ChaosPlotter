@@ -7,7 +7,7 @@
 #endif
 
 #ifndef BOUND
-#define BOUND 4.0f
+#define BOUND 40000.0f
 #endif
 
 #ifndef DENSITY
@@ -16,7 +16,7 @@
 
 struct ViewParams
 {
-    float left, right, top, bottom, d;
+    double left, right, top, bottom, d;
 };
 
 enum Tags
@@ -29,9 +29,9 @@ enum Tags
 
 struct Data
 {
-    float x;
-    float y;
-    float f;
+    double x;
+    double y;
+    double f;
 };
 
 typedef std::vector<Data> Path;

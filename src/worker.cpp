@@ -7,7 +7,7 @@ worker::worker(int rank, int size) : rank(rank), size(size), window({0, 0, 0, 0,
 {
 }
 
-Path worker::computePath(float x, float y)
+Path worker::computePath(double x, double y)
 {
     std::vector<Data> ret;
     Point p = {x, y};
@@ -22,7 +22,7 @@ Path worker::computePath(float x, float y)
 
         p = function(p, {x, y});
 
-        ret.push_back(Data{p.x, p.y, (float)i});
+        ret.push_back(Data{p.x, p.y, (double)i});
     }
     return ret;
 }
@@ -32,14 +32,17 @@ void worker::recieve()
     int paramFlag;
     MPI_Status statusV;
     MPI_Iprobe(0, TAG_VIEWING, MPI_COMM_WORLD, &paramFlag, &statusV);
-    if (paramFlag)
+    while (paramFlag)
     {
         MPI_Recv(&window, sizeof(ViewParams), MPI_BYTE, 0, TAG_VIEWING, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
-        // float d = window.right - window.left;
-        // window.left = ((float)rank-1)*d/((float)size - 1) + window.left;
-        // window.right = ((float)rank)*d/((float)size - 1) + window.left;
-        // printf("Worker %d received new params\n", rank);
+        // double d = window.right - window.left;
+        // window.left = ((double)rank-1)*d/((double)size - 1) + window.left;
+        // window.right = ((double)rank)*d/((double)size - 1) + window.left;
+
+        printf("Worker %d received new params: x[%e, %e] y[%e, %e] %e\n", rank, window.left, window.right, window.top, window.bottom, window.d);
+        paramFlag = 0;
+        MPI_Iprobe(0, TAG_VIEWING, MPI_COMM_WORLD, &paramFlag, &statusV);
     }
 
     int endFlag;
@@ -56,18 +59,19 @@ void worker::recieve()
 
 void worker::compute()
 {
-    std::vector<float> batch;
+    std::vector<double> batch;
     int pathCount = 0;
 
-    for (float cx = window.left; cx <= window.right; cx += window.d)
+    for (double cx = window.left; cx <= window.right; cx += window.d)
     {
-        for (float cy = window.top; cy <= window.bottom; cy += window.d)
+        for (double cy = window.top; cy <= window.bottom; cy += window.d)
         {
-            float dx = window.d * ((float)random() / (float)RAND_MAX - 0.5);
-            float dy = window.d * ((float)random() / (float)RAND_MAX - 0.5);
+            // double dx = window.d * ((double)random() / (double)RAND_MAX - 0.5);
+            double dx = (window.d/((double)size - 1)) * ((double)random() / (double)RAND_MAX) + window.d*((double)rank-1)/((double)size - 1);
+            double dy = window.d * ((double)random() / (double)RAND_MAX - 0.5);
 
-            float xi = cx + dx;
-            float yi = cy + dy;
+            double xi = cx + dx;
+            double yi = cy + dy;
             std::vector<Data> orbit = computePath(xi, yi);
             int size = orbit.size();
             if (size == 0)
@@ -84,7 +88,7 @@ void worker::compute()
             }
             orbit[0].f = size;
 
-            batch.push_back((float)orbit.size());
+            batch.push_back((double)orbit.size());
             for (Data d : orbit) {
                 batch.push_back(d.x);
                 batch.push_back(d.y);
@@ -96,7 +100,7 @@ void worker::compute()
 
     int batchSize = batch.size();
     MPI_Send(&batchSize, 1, MPI_INT, 0, TAG_PATH_SIZE, MPI_COMM_WORLD);
-    MPI_Send(batch.data(), batchSize, MPI_FLOAT, 0, TAG_PATH, MPI_COMM_WORLD);
+    MPI_Send(batch.data(), batchSize, MPI_DOUBLE, 0, TAG_PATH, MPI_COMM_WORLD);
 }
 
 void worker::mainloop()

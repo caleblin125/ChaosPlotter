@@ -3,11 +3,20 @@
 #include <math.h>
 
 Point function(Point p, Point pi){
-    float x = p.x;
-    float y = p.y;
-    // float xi = x*x - y + pi.x*y;
-    // float yi = 2.0*y*sin(x) + pi.y*x;
-    float xi = x*x - y*y + pi.x;
-    float yi = 2.0*x*y + pi.y;
+    double x = p.x;
+    double y = p.y;
+
+    double tx = x*x - y*y + pi.x;
+    double ty = 2*x*y + pi.y;
+    double xi = tx*x - abs(ty*y - pi.x);
+    double yi = abs(tx*y + ty*x) + pi.y;
+
+    //Burning ship
+    // double xi = x*x - y*y + pi.x;
+    // double yi = abs(2*x*y) + pi.y;
+
+    //Mandelbrot
+    // double xi = x*x - y*y + pi.x;
+    // double yi = 2.0*x*y + pi.y;
     return {xi, yi};
 }

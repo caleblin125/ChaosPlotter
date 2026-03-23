@@ -7,7 +7,7 @@ class worker
 {
 public:
     worker(int rank, int size);
-    Path computePath(float x, float y);
+    Path computePath(double x, double y);
     void compute();
     void recieve();
     void mainloop();

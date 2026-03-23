@@ -9,13 +9,13 @@
 #include <cstring>
 
 // h: 0-360, s: 0-1, v: 0-1
-Color renderer::HSVtoRGB(float h, float s, float v)
+Color renderer::HSVtoRGB(double h, double s, double v)
 {
-    float c = v * s; // Chroma
-    float x = c * (1 - std::fabs(fmod(h / 60.0f, 2) - 1));
-    float m = v - c;
+    double c = v * s; // Chroma
+    double x = c * (1 - std::fabs(fmod(h / 60.0f, 2) - 1));
+    double m = v - c;
 
-    float r1, g1, b1;
+    double r1, g1, b1;
 
     if (h < 60)
     {
@@ -73,7 +73,7 @@ renderer::renderer(int rank, int size) : rank(rank), size(size)
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     if (!monitor)
     {
-        std::cerr << "Failed to get primary monitor\n";
+        printf("Failed to get primary monitor\n");
         error = 1;
         return;
     }
@@ -81,7 +81,7 @@ renderer::renderer(int rank, int size) : rank(rank), size(size)
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
     if (!mode)
     {
-        std::cerr << "Failed to get video mode\n";
+        printf("Failed to get video mode\n");
         error = 1;
         return;
     }
@@ -105,7 +105,7 @@ renderer::renderer(int rank, int size) : rank(rank), size(size)
 
     if (!window)
     {
-        std::cerr << "Failed to create GLFW window\n";
+        printf("Failed to create GLFW window\n");
         glfwTerminate();
         error = 1;
         return;
@@ -122,9 +122,9 @@ renderer::renderer(int rank, int size) : rank(rank), size(size)
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    scale.scale = 1.5f;
-    scale.cx = -0.5f;
-    scale.cy = 0.0f;
+    scale.scale = 0.7;
+    scale.cx = 0.0;
+    scale.cy = 0.0;
 
     glfwSetWindowUserPointer(window, this);
     glfwSetScrollCallback(window, scroll_callback);
@@ -143,12 +143,12 @@ void renderer::recieve()
         int pathCount, batchSize;
         MPI_Recv(&batchSize, 1, MPI_INT, source, TAG_PATH_SIZE, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        std::vector<float> batch(batchSize);
-        MPI_Recv(batch.data(), batchSize, MPI_FLOAT, source, TAG_PATH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        std::vector<double> batch(batchSize);
+        MPI_Recv(batch.data(), batchSize, MPI_DOUBLE, source, TAG_PATH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         // unpack
         int i = 0;
-        float* raw = batch.data();
+        double* raw = batch.data();
         while (i < batchSize) {
             int sz = (int)raw[i++];
 
@@ -179,22 +179,22 @@ void renderer::render()
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
-    float bound = std::min(width, height);
-    float widthf = (float)width;
-    float heightf = (float)height;
+    double bound = std::min(width, height);
+    double widthf = (double)width;
+    double heightf = (double)height;
 
-    float left = -widthf / bound * scale.scale + scale.cx;
-    float right = widthf / bound * scale.scale + scale.cx;
-    float top = -heightf / bound * scale.scale + scale.cy;
-    float bottom = heightf / bound * scale.scale + scale.cy;
-    float d = scale.scale / DENSITY;
+    double left = -widthf / bound * scale.scale + scale.cx;
+    double right = widthf / bound * scale.scale + scale.cx;
+    double top = -heightf / bound * scale.scale + scale.cy;
+    double bottom = heightf / bound * scale.scale + scale.cy;
+    double d = scale.scale / (double)DENSITY;
     glOrtho(left, right, top, bottom, -1, 1); // ← ortho before switching
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
     if ((params.left != left) || (params.right != right) || (params.top != top) || (params.bottom != bottom) || (params.d != d))
     {   
-        printf("Sent New Window Data\n");
+        printf("Sent New Window Data: scale: %e center: (%e, %e)\n", scale.scale, scale.cx, scale.cy);
         params = {left, right, top, bottom, d};
         for (int i = 1; i < size; i++){
             MPI_Send(&params, sizeof(ViewParams), MPI_BYTE, i, TAG_VIEWING, MPI_COMM_WORLD);
@@ -214,10 +214,10 @@ void renderer::render()
         //     Data p1 = path[i];
         //     Data p2 = path[i + 1];
 
-        //     float a = atan2(p2.y - p1.y, p2.x - p1.x);
-        //     float dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
+        //     double a = atan2(p2.y - p1.y, p2.x - p1.x);
+        //     double dist = sqrt((p2.y - p1.y) * (p2.y - p1.y) + (p2.x - p1.x) * (p2.x - p1.x));
 
-        //     float p = (float)i / (float)path.size();
+        //     double p = (double)i / (double)path.size();
         //     Color c = HSVtoRGB(a * 360.0 / M_PI / 2.0 + 180.0, 1.0, 1.0);
 
         //     glColor4f(c.r, c.g, c.b, 0.02f * dist / 2.0f);
@@ -231,9 +231,9 @@ void renderer::render()
             glVertex2f(path[0].x, path[0].y);
         }
         else{
-            float r = fmod(path[0].f, 5.0f) / 5.0f / 2.0f;
-            float g = fmod(path[0].f, 7.0f) / 7.0f / 2.0f;
-            float b = fmod(path[0].f, 19.0f) / 19.0f / 2.0f;
+            double r = fmod(path[0].f, 5.0f)  /  5.0;
+            double g = fmod(path[0].f, 7.0f)  /  7.0;
+            double b = fmod(path[0].f, 19.0f) / 19.0;
             glColor4f(r, g, b, 1.0);
             glVertex2f(path[0].x, path[0].y);
         }
@@ -267,7 +267,7 @@ void renderer::mainloop()
                                  w, h, 0);
         }
 
-        float dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - prevT).count();
+        double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - prevT).count();
         prevT = std::chrono::steady_clock::now();
         if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
         {
