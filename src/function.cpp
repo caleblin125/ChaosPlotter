@@ -8,6 +8,7 @@ std::vector<Data> compute(float x, float y){
     float xi = x, yi = y;
     for(int i = 0; i < 100; i++){
         if(xi*xi + yi*yi > 4){
+            ret.push_back(Data{xi, yi, (float)-1});
             break;
         }
         float xit = xi, yit = yi;
